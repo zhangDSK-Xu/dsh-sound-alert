@@ -1,0 +1,39 @@
+{
+  "name": "dsh-sound-alert",
+  "version": "1.0.0",
+  "description": "DSH 授权 / 选择请求的声音提醒：需要你授权或做出选择时播放提示音并弹出提醒卡片",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "approval",
+    "alert",
+    "sound",
+    "notification"
+  ],
+  "type": "module",
+  "main": "lib/entry.mjs",
+  "exports": {
+    ".": "./lib/entry.mjs",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "icon": "./icon.svg",
+  "meta": {
+    "title": "授权声音提醒",
+    "description": "DSH 需要你授权或做出选择时播放提示音并弹出提醒卡片。"
+  },
+  "files": [
+    "lib",
+    "locale",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT"
+}
