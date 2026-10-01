@@ -46,27 +46,39 @@ DSH 需要**你授权**（工具调用审批）或**让你做选择**（`ask_use
 
 ## 安装
 
-前提：已装好 DSH（Harness），并把本仓库放在本机任意位置。
+前提：已装好 DSH（Harness）。
 
-### 方式一：作为 bundle 安装（推荐）
+### 最简单的装法
 
-```powershell
-dsh plugin --profile <profile> add link:<本仓库绝对路径>
+在 DSH 里打开 **设置 → 插件**，把下面这行填进安装输入框：
+
+```
+github:zhangDSK-Xu/dsh-sound-alert
 ```
 
-例如把默认 Web 界面（profile 名 `web`）装上：
+或者用命令行一步装好（`web` 是默认 Web 界面的 profile 名，换成你要装的那个即可）：
+
+```powershell
+dsh plugin --profile web add github:zhangDSK-Xu/dsh-sound-alert
+```
+
+完整的仓库地址也一样能装：`https://github.com/zhangDSK-Xu/dsh-sound-alert`。
+
+装好后插件会出现在**设置 → 插件**的清单里（带图标与显示名），可以直接从界面禁用或卸载。
+
+> **网络**：如果你的环境需要代理才能访问 GitHub，先给当前终端设上代理再执行安装，例如
+> `$env:HTTPS_PROXY = 'http://127.0.0.1:7897'`（端口换成你自己的）。
+
+### 其它装法
+
+**从本地目录装** —— 适合自己改插件代码的时候，改完不用重装：
 
 ```powershell
 dsh plugin --profile web add link:D:/path/to/dsh-sound-alert
 ```
 
-装好后会出现在 DSH 的**设置 → 插件**里（带图标与显示名），可以直接从界面禁用或卸载。
-这也等价于在插件页那栏「本地目录路径」里填本仓库路径。
-
-### 方式二：profile 补丁层挂载
-
-CLI 无法操作的 profile（例如被 Electron 独占的 `desktop`）用这种方式：
-在 `$DSH_HOME/profiles/<profile>/cordis.patch.yml` 末尾追加
+**profile 补丁层挂载** —— 只用于 CLI 无法操作的 profile（例如被 Electron 独占的 `desktop`）。
+在 `$DSH_HOME/profiles/<profile>/cordis.patch.yml` 末尾追加：
 
 ```yaml
 - insert:
@@ -80,10 +92,10 @@ CLI 无法操作的 profile（例如被 Electron 独占的 `desktop`）用这种
 ### 卸载
 
 ```powershell
-# 方式一装的
-dsh plugin --profile <profile> remove dsh-sound-alert
-# 方式二装的：删掉 cordis.patch.yml 里那条 - insert: 条目
+dsh plugin --profile web remove dsh-sound-alert
 ```
+
+补丁层方式装的，删掉 `cordis.patch.yml` 里那条 `- insert:` 条目即可。
 
 ---
 
