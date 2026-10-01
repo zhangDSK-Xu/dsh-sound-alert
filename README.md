@@ -90,15 +90,15 @@ DSH 需要**你授权**（工具调用审批）或**让你做选择**（`ask_use
 已作为 **bundle** 登记进 profile：
 
 ```jsonc
-// C:\Users\Admin\.dsh\profiles\web\package.json
-"dependencies": { "dsh-sound-alert": "link:D:/myProject/dsh_Plugin/dsh-sound-alert" },
+// $DSH_HOME/profiles/web/package.json
+"dependencies": { "dsh-sound-alert": "link:<本仓库绝对路径>" },
 "dsh": { "profile": { "bundles": [ ..., "dsh-sound-alert" ] } }
 ```
 
 安装命令（就是 DSH 官方插件页「本地目录路径」那一栏背后执行的同一件事）：
 
 ```powershell
-dsh plugin --profile web add link:D:/myProject/dsh_Plugin/dsh-sound-alert
+dsh plugin --profile web add link:<本仓库绝对路径>
 ```
 
 因为它现在是**已安装的包 + bundle 层**，所以会出现在 DSH 的**插件配置/插件清单**里
@@ -112,7 +112,7 @@ dsh plugin --profile web add link:D:/myProject/dsh_Plugin/dsh-sound-alert
 ### desktop profile（`http://127.0.0.1:19387`）—— 补丁层挂载
 
 `desktop` profile 被 Electron 独占，CLI 不允许对它执行 `dsh plugin`，所以那里仍用
-`C:\Users\Admin\.dsh\profiles\desktop\cordis.patch.yml` 里的「绝对路径 insert」。
+`$DSH_HOME/profiles/desktop/cordis.patch.yml` 里的「绝对路径 insert」。
 这个实例正是**你这个会话真正运行的地方**，必须保留（3080 的页面靠跨实例监听它）。
 
 ### 卸载 / 回滚
@@ -123,7 +123,7 @@ dsh plugin --profile web remove dsh-sound-alert
 # desktop profile：删除 cordis.patch.yml 里那条 - insert: 条目
 ```
 
-原始文件备份都在 `.install-backup\`：
+安装前的原始文件备份（**本仓库不含该目录**，仅为本地留档）：
 `web-package.json.orig`、`web-pnpm-lock.yaml.orig`、`web-cordis.patch.yml.orig`、
 `desktop-cordis.patch.yml.orig`。
 
@@ -158,7 +158,7 @@ dsh-sound-alert/
 **改完先跑冒烟测试**（不需要浏览器）：
 
 ```powershell
-cd D:\myProject\dsh_Plugin\dsh-sound-alert
+cd <本仓库>
 node test\smoke.mjs      # 期望输出 SMOKE PASS
 ```
 
@@ -214,7 +214,7 @@ Invoke-WebRequest http://127.0.0.1:19387/dsh-sound-alert/test.json -Method POST 
 
 ## 六、验证结果
 
-**已在你的机器上端到端验证**
+**已在开发机上端到端验证**
 
 | 项 | 证据 |
 |---|---|
@@ -225,15 +225,15 @@ Invoke-WebRequest http://127.0.0.1:19387/dsh-sound-alert/test.json -Method POST 
 | 页面脚本 | 浏览器 `streams=1`，且页面自己点过「模拟一条提醒」（服务端收到该请求） |
 | **真实授权事件** | 19387 记录到 `kind=approval, toolName="write", callId=call_00_ET_…`，`sessionId` 为真实会话 |
 | **真实选择事件** | 19387 记录到两次 `kind=question`，携带真实问题文本与选项 |
-| **提示音** | 你本人确认「听到了，很清楚」 |
+| **提示音** | 已确认「听到了，很清楚」 |
 | **跨实例监听** | 只从 19387 发出的提醒，在 3080 的页面上听到，卡片标注「来自 127.0.0.1:19387」 |
 | **bundle 安装** | `dsh plugin --profile web add link:…` 后依赖与 bundles 列表均登记，插件仍在线（`build=2`），小鲸鱼链接未受影响 |
-| **出现在插件配置页** | 你确认「设置 → 插件」里能看到 `dsh-sound-alert` |
-| **位置不再遮挡** | 你确认铃铛在右下角、不再压住左侧侧边栏底部的设置按钮 |
-| **拖拽与四角吸附** | 你确认拖动与自动吸附生效 |
-| **轻点 ▽ 打开设置面板** | 你确认修复后在页面上能正常打开 |
-| **轻点铃铛切换开关** | 你确认能在 🔔 / 🔕 之间切换 |
-| **分段选择改色** | 你确认原下拉列表未选中项看不清，已改为面板内自绘分段选择 |
+| **出现在插件配置页** | 已确认「设置 → 插件」里能看到 `dsh-sound-alert` |
+| **位置不再遮挡** | 已确认铃铛在右下角、不再压住左侧侧边栏底部的设置按钮 |
+| **拖拽与四角吸附** | 已确认拖动与自动吸附生效 |
+| **轻点 ▽ 打开设置面板** | 已确认修复后在页面上能正常打开 |
+| **轻点铃铛切换开关** | 已确认能在 🔔 / 🔕 之间切换 |
+| **分段选择改色** | 已确认原下拉列表未选中项看不清，已改为面板内自绘分段选择 |
 | **页面脚本回归** | `node test/smoke.mjs` 39 项断言全通过（位置/吸附/拖动/轻点按钮/分段选择/卡片/面板/持久化） |
 
 **已知限制**
