@@ -140,6 +140,18 @@ const body = makeNode('body')
 const head = makeNode('head')
 const documentListeners = {}
 
+// 主用例里的系统通知记录（页面内已无卡片，提醒只走系统通知）
+const mainNotes = []
+class MainNotification {
+  constructor(title, options) {
+    this.title = title
+    this.options = options || {}
+    mainNotes.push(this)
+  }
+  close() {}
+}
+MainNotification.permission = 'granted'
+
 const document = {
   head,
   body,
@@ -209,8 +221,9 @@ const windowStub = {
 }
 
 const sandbox = {
-  // 主用例按「桌面端窗口可见」的场景跑：弹窗类提醒只在桌面端启用。
+  // 主用例按「桌面端窗口」的场景跑（有 dshDesktopBoot，但 HOST_BASE 为空，URL 仍走相对路径）。
   dshDesktopBoot: {},
+  Notification: MainNotification,
   document,
   window: windowStub,
   location: { origin: 'http://127.0.0.1:3080', host: '127.0.0.1:3080', href: 'http://127.0.0.1:3080/' },
@@ -257,20 +270,11 @@ check('铃铛按钮存在', !!bellBtn)
 check('设置按钮存在', !!caretBtn)
 check('铃铛初始可点击且已开音', bellBtn && bellBtn.textContent === '🔔', bellBtn && bellBtn.textContent)
 
-const cards = find(body, (node) => node.__classes.includes('dsa-card'))
-check('收到提醒后弹出了卡片', cards.length === 1, 'cards=' + cards.length)
-const cardText = cards[0] ? textOf(cards[0]) : ''
-check('卡片带授权标题', cardText.includes('需要你授权'), cardText.slice(0, 80))
-check('卡片带工具名', cardText.includes('write'), cardText.slice(0, 80))
-check('卡片带原因', cardText.includes('冒烟测试'), cardText.slice(0, 80))
-check('卡片容器在右下角上方', find(body, (n) => n.__classes.includes('dsa-cards'))[0].style.bottom === '52px')
+// 页面内已经没有卡片了：提醒只走系统通知 + 声音 + 标题闪烁
+check('页面内不再有卡片元素', find(body, (n) => n.__classes.includes('dsa-card')).length === 0)
+check('页面内不再有卡片容器', find(body, (n) => n.__classes.includes('dsa-cards')).length === 0)
 check('标题已加铃铛前缀', document.title.indexOf('🔔 ') === 0, JSON.stringify(document.title))
-console.log('      卡片内容: ' + cardText.replace(/\s+/g, ' ').trim().slice(0, 120))
-
-// 点「知道了」应停掉重复提醒并淡出卡片
-const ack = find(cards[0], (node) => node.__classes.includes('dsa-ack'))[0]
-check('卡片有「知道了」按钮', !!ack)
-ack.dispatch('click')
+check('收到提醒即弹系统通知（与窗口是否前台无关）', mainNotes.length === 1, 'notes=' + mainNotes.length)
 
 // 打开设置面板
 caretBtn.dispatch('click')
@@ -282,15 +286,14 @@ check('面板贴右下角', panel && panel.style.right === '12px' && panel.style
 const findChip = (container, text) =>
   find(container, (n) => n.__classes.includes('dsa-chip') && String(n.textContent) === text)[0]
 
+check('面板内已无「页面内提醒卡片」选项', !findChip(panel, '自动') && !findChip(panel, '总是弹') && !findChip(panel, '从不弹'), '')
+check('面板内有系统通知开关', !!find(panel, (n) => n.tagName === 'LABEL' && textOf(n).includes('系统通知'))[0])
 check('面板内有铃铛位置分段选择', !!findChip(panel, '左上'))
 findChip(panel, '左上').dispatch('click')
 check('选「左上」后停靠组贴左上', dock.style.left === '12px' && dock.style.top === '12px', JSON.stringify(dock.style))
 check('选中的分段有选中态', findChip(panel, '左上').__classes.includes('dsa-chip-on'))
-check('切角后卡片容器跟随', find(body, (n) => n.__classes.includes('dsa-cards'))[0].style.left === '12px')
 
 findChip(panel, '右上').dispatch('click')
-const cardsHost = find(body, (n) => n.__classes.includes('dsa-cards'))[0]
-check('右上角时卡片改为向下堆叠', cardsHost.style.flexDirection === 'column', cardsHost.style.flexDirection)
 check('右上角时面板贴右上', panel.style.right === '12px' && panel.style.top === '52px', JSON.stringify(panel.style))
 
 // 分段选择替代了原生 select：不会再弹出系统浅色列表
@@ -515,15 +518,17 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
   await new Promise((resolve) => setTimeout(resolve, 20))
 
   check('Web 端：不弹窗口内卡片', find(wBody, (n) => n.__classes.includes('dsa-card')).length === 0)
-  check('Web 端：不弹浏览器通知（即使已授权）', webNotes.length === 0, 'notes=' + webNotes.length)
+  check('Web 端：弹浏览器通知', webNotes.length === 1, 'notes=' + webNotes.length)
+  check('Web 端：通知标题标明是授权请求', webNotes[0] && webNotes[0].title === 'DSH 需要你授权', webNotes[0] && webNotes[0].title)
   check('Web 端：仍然处理了提醒（标题加铃铛前缀）', String(wBody.title).indexOf('🔔 ') === 0 || String(wSandbox.document.title).indexOf('🔔 ') === 0)
 
   const webCaret = find(wBody, (n) => n.__classes.includes('dsa-caret'))[0]
   webCaret.dispatch('click')
   await new Promise((resolve) => setTimeout(resolve, 0))
   const webChips = find(wBody, (n) => n.__classes.includes('dsa-chip')).map((n) => String(n.textContent))
-  check('Web 端：面板不显示弹窗类设置', webChips.indexOf('自动') === -1 && webChips.indexOf('总是弹') === -1, JSON.stringify(webChips))
+  check('Web 端：面板不显示卡片选项', webChips.indexOf('自动') === -1 && webChips.indexOf('总是弹') === -1, JSON.stringify(webChips))
   check('Web 端：面板仍显示声音相关设置', webChips.indexOf('叮咚') !== -1 && webChips.indexOf('右下') !== -1, JSON.stringify(webChips))
+  check('Web 端：面板里有系统通知开关', !!find(wBody, (n) => n.tagName === 'LABEL' && textOf(n).includes('系统通知'))[0])
 }
 
 console.log(failures === 0 ? '\nSMOKE PASS' : `\nSMOKE FAIL (${failures})`)
