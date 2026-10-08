@@ -1,7 +1,7 @@
 {
   "name": "dsh-sound-alert",
-  "version": "1.0.0",
-  "description": "DSH 授权 / 选择请求的声音提醒：需要你授权或做出选择时播放提示音并弹出提醒卡片",
+  "version": "1.1.0",
+  "description": "DSH 授权 / 选择请求的声音提醒：需要你授权或做出选择时播放提示音并弹出系统通知",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -21,7 +21,7 @@
   "icon": "./icon.svg",
   "meta": {
     "title": "授权声音提醒",
-    "description": "DSH 需要你授权或做出选择时播放提示音并弹出提醒卡片。"
+    "description": "DSH 需要你授权或做出选择时播放提示音并弹出系统通知。"
   },
   "files": [
     "lib",
