@@ -356,15 +356,31 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
   const dBody = makeNode('body')
   const dHead = makeNode('head')
   const urls = []
-  const dWindow = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, removeEventListener() {} }
+  // 模拟「窗口最小化」：hidden=true、没有焦点，于是应当补一条系统通知。
+  const nativeNotes = []
+  class StubNotification {
+    constructor(title, options) {
+      this.title = title
+      this.options = options || {}
+      this.closed = false
+      nativeNotes.push(this)
+    }
+    close() {
+      this.closed = true
+    }
+  }
+  StubNotification.permission = 'granted'
+  const dWindow = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, removeEventListener() {}, focus() {} }
   const dSandbox = {
     __DSH_TRANSPORT__: { ownsHost: true, streamBaseUrl: 'http://127.0.0.1:19387' },
+    Notification: StubNotification,
     document: {
       head: dHead,
       body: dBody,
       title: 'DSH',
       readyState: 'complete',
-      hidden: false,
+      hidden: true,
+      hasFocus: () => false,
       createElement: makeNode,
       createTextNode(text) {
         return { nodeType: 3, textContent: String(text), children: [], __classes: [], contains: () => false }
@@ -377,7 +393,18 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
     localStorage: { getItem: () => null, setItem() {} },
     fetch: async (url) => {
       urls.push(String(url))
-      return { ok: true, status: 200, json: async () => ({ ok: true, seq: 0, alerts: [] }) }
+      const alerts = String(url).includes('127.0.0.1:19387')
+        ? [{
+          seq: 1,
+          ts: Date.now(),
+          resolved: false,
+          kind: 'approval',
+          title: '需要你授权',
+          toolName: 'write',
+          reason: '系统通知冒烟测试',
+        }]
+        : []
+      return { ok: true, status: 200, json: async () => ({ ok: true, seq: alerts.length, alerts }) }
     },
     URL,
     console,
@@ -413,6 +440,18 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
     urls.some((u) => u.startsWith('http://127.0.0.1:3080/dsh-sound-alert/')),
     urls.join(' , '),
   )
+
+  // 系统通知：窗口最小化时也要弹在屏幕上
+  check('桌面端：窗口最小化时弹了系统通知', nativeNotes.length === 1, 'notes=' + nativeNotes.length)
+  const note = nativeNotes[0]
+  check('通知标题标明是授权请求', note && note.title === 'DSH 需要你授权', note && note.title)
+  check(
+    '通知正文带工具名与原因',
+    note && String(note.options.body).includes('write') && String(note.options.body).includes('系统通知冒烟测试'),
+    note && note.options.body,
+  )
+  check('通知用 silent 避免和插件提示音重复响', note && note.options.silent === true, String(note && note.options.silent))
+  check('通知带 tag，同一条提醒不会重复弹', note && note.options.tag === 'local#1', String(note && note.options.tag))
 }
 
 console.log(failures === 0 ? '\nSMOKE PASS' : `\nSMOKE FAIL (${failures})`)
