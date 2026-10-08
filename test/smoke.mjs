@@ -209,6 +209,8 @@ const windowStub = {
 }
 
 const sandbox = {
+  // 主用例按「桌面端窗口可见」的场景跑：弹窗类提醒只在桌面端启用。
+  dshDesktopBoot: {},
   document,
   window: windowStub,
   location: { origin: 'http://127.0.0.1:3080', host: '127.0.0.1:3080', href: 'http://127.0.0.1:3080/' },
@@ -455,6 +457,73 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
   // 默认 auto：系统通知已经弹过，就不该再在窗口内重复弹一张卡片
   const desktopCards = find(dBody, (n) => n.__classes.includes('dsa-card')).length
   check('桌面端：弹过系统通知就不再重复弹窗口内卡片', desktopCards === 0, 'cards=' + desktopCards)
+}
+
+// -------------------------------------------------------------------- Web（dsh web）
+// web 端只保留声音：不弹窗口内卡片，也不弹浏览器通知（即使浏览器已经授权）。
+{
+  const wBody = makeNode('body')
+  const wHead = makeNode('head')
+  const webNotes = []
+  class WebNotification {
+    constructor(title, options) {
+      this.title = title
+      this.options = options
+      webNotes.push(this)
+    }
+    close() {}
+  }
+  WebNotification.permission = 'granted'
+  const wWindow = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, removeEventListener() {}, focus() {} }
+  const wSandbox = {
+    Notification: WebNotification,
+    document: {
+      head: wHead,
+      body: wBody,
+      title: 'DSH',
+      readyState: 'complete',
+      hidden: true,
+      hasFocus: () => false,
+      createElement: makeNode,
+      createTextNode(text) {
+        return { nodeType: 3, textContent: String(text), children: [], __classes: [], contains: () => false }
+      },
+      addEventListener() {},
+      removeEventListener() {},
+    },
+    window: wWindow,
+    location: { origin: 'http://127.0.0.1:3080', host: '127.0.0.1:3080', href: 'http://127.0.0.1:3080/' },
+    localStorage: { getItem: () => null, setItem() {} },
+    fetch: async (url) => {
+      // web 端没有 HOST_BASE，本页实例走相对路径；对端实例是绝对地址。
+      const local = String(url).startsWith('/')
+      const alerts = local
+        ? [{ seq: 1, ts: Date.now(), resolved: false, kind: 'approval', title: '需要你授权', toolName: 'write', reason: 'web 端只响铃' }]
+        : []
+      return { ok: true, status: 200, json: async () => ({ ok: true, seq: alerts.length, alerts }) }
+    },
+    URL,
+    console,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    requestAnimationFrame: (fn) => setTimeout(fn, 0),
+  }
+  wSandbox.globalThis = wSandbox
+  vm.runInNewContext(code, wSandbox, { filename: 'widget.web.js' })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+
+  check('Web 端：不弹窗口内卡片', find(wBody, (n) => n.__classes.includes('dsa-card')).length === 0)
+  check('Web 端：不弹浏览器通知（即使已授权）', webNotes.length === 0, 'notes=' + webNotes.length)
+  check('Web 端：仍然处理了提醒（标题加铃铛前缀）', String(wBody.title).indexOf('🔔 ') === 0 || String(wSandbox.document.title).indexOf('🔔 ') === 0)
+
+  const webCaret = find(wBody, (n) => n.__classes.includes('dsa-caret'))[0]
+  webCaret.dispatch('click')
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  const webChips = find(wBody, (n) => n.__classes.includes('dsa-chip')).map((n) => String(n.textContent))
+  check('Web 端：面板不显示弹窗类设置', webChips.indexOf('自动') === -1 && webChips.indexOf('总是弹') === -1, JSON.stringify(webChips))
+  check('Web 端：面板仍显示声音相关设置', webChips.indexOf('叮咚') !== -1 && webChips.indexOf('右下') !== -1, JSON.stringify(webChips))
 }
 
 console.log(failures === 0 ? '\nSMOKE PASS' : `\nSMOKE FAIL (${failures})`)
