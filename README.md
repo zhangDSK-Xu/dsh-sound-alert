@@ -65,6 +65,10 @@ dsh plugin --profile web add github:zhangDSK-Xu/dsh-sound-alert
 
 完整的仓库地址也一样能装：`https://github.com/zhangDSK-Xu/dsh-sound-alert`。
 
+**同一行也能装到桌面端**（Electron 应用）：打开它的 **设置 → 插件**，把同一行填进安装输入框
+即可 —— 桌面端那个 profile 被 Electron 独占、`dsh plugin` 命令不允许操作它，但插件页可以。
+两端装的是同一份代码，功能一致（区别只在通知由谁发出：桌面端是 Windows 通知，web 是浏览器通知）。
+
 装好后插件会出现在**设置 → 插件**的清单里（带图标与显示名），可以直接从界面禁用或卸载。
 
 > **网络**：如果你的环境需要代理才能访问 GitHub，先给当前终端设上代理再执行安装，例如
@@ -78,7 +82,7 @@ dsh plugin --profile web add github:zhangDSK-Xu/dsh-sound-alert
 dsh plugin --profile web add link:D:/path/to/dsh-sound-alert
 ```
 
-**profile 补丁层挂载** —— 只用于 CLI 无法操作的 profile（例如被 Electron 独占的 `desktop`）。
+**profile 补丁层挂载** —— 兜底手段：当某个 profile 既不能用 `dsh plugin`、也无法从插件页安装时，
 在 `$DSH_HOME/profiles/<profile>/cordis.patch.yml` 末尾追加：
 
 ```yaml
