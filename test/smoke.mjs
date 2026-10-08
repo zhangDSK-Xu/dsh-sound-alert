@@ -348,5 +348,72 @@ const saved = JSON.parse(storage.get('dsh-sound-alert.settings.v1') || '{}')
 check('设置已写入 localStorage', saved.bellCorner === 'tl', JSON.stringify(saved.bellCorner))
 check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
 
+// ---------------------------------------------------------- 桌面端（dsh-app://app/）
+// 桌面窗口来自 dsh-app://app/，页面通过 __DSH_TRANSPORT__.streamBaseUrl 拿到 Host 的
+// origin（相对路径的流式请求会被 IPC 转发缓冲掉）。这里验证：
+//   1) 请求一律改走该 origin；2) 不会把同一个 Host 又当成「额外实例」重复监听。
+{
+  const dBody = makeNode('body')
+  const dHead = makeNode('head')
+  const urls = []
+  const dWindow = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, removeEventListener() {} }
+  const dSandbox = {
+    __DSH_TRANSPORT__: { ownsHost: true, streamBaseUrl: 'http://127.0.0.1:19387' },
+    document: {
+      head: dHead,
+      body: dBody,
+      title: 'DSH',
+      readyState: 'complete',
+      hidden: false,
+      createElement: makeNode,
+      createTextNode(text) {
+        return { nodeType: 3, textContent: String(text), children: [], __classes: [], contains: () => false }
+      },
+      addEventListener() {},
+      removeEventListener() {},
+    },
+    window: dWindow,
+    location: { origin: 'dsh-app://app', host: 'app', href: 'dsh-app://app/' },
+    localStorage: { getItem: () => null, setItem() {} },
+    fetch: async (url) => {
+      urls.push(String(url))
+      return { ok: true, status: 200, json: async () => ({ ok: true, seq: 0, alerts: [] }) }
+    },
+    URL,
+    console,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    requestAnimationFrame: (fn) => setTimeout(fn, 0),
+  }
+  dSandbox.globalThis = dSandbox
+  vm.runInNewContext(code, dSandbox, { filename: 'widget.desktop.js' })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+
+  const desktopSources = Object.keys(dWindow.__dshSoundAlertApi.sources())
+  check('桌面端：本页实例走 Host origin', desktopSources.includes('local'))
+  check(
+    '桌面端：不会把同一个 Host 重复算作额外实例',
+    !desktopSources.includes('http://127.0.0.1:19387'),
+    JSON.stringify(desktopSources),
+  )
+  check(
+    '桌面端：额外来源只剩真正不同的实例',
+    desktopSources.length === 2 && desktopSources.includes('http://127.0.0.1:3080'),
+    JSON.stringify(desktopSources),
+  )
+  check(
+    '桌面端：本页实例的请求指向 Host origin',
+    urls.includes('http://127.0.0.1:19387/dsh-sound-alert/state.json'),
+    urls.slice(0, 3).join(' , ') || '(无请求)',
+  )
+  check(
+    '桌面端：对端来源用自己的 origin，不叠加 Host 基址',
+    urls.some((u) => u.startsWith('http://127.0.0.1:3080/dsh-sound-alert/')),
+    urls.join(' , '),
+  )
+}
+
 console.log(failures === 0 ? '\nSMOKE PASS' : `\nSMOKE FAIL (${failures})`)
 process.exit(failures === 0 ? 0 : 1)
