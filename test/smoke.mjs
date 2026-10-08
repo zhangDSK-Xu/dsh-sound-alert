@@ -452,6 +452,9 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
   )
   check('通知用 silent 避免和插件提示音重复响', note && note.options.silent === true, String(note && note.options.silent))
   check('通知带 tag，同一条提醒不会重复弹', note && note.options.tag === 'local#1', String(note && note.options.tag))
+  // 默认 auto：系统通知已经弹过，就不该再在窗口内重复弹一张卡片
+  const desktopCards = find(dBody, (n) => n.__classes.includes('dsa-card')).length
+  check('桌面端：弹过系统通知就不再重复弹窗口内卡片', desktopCards === 0, 'cards=' + desktopCards)
 }
 
 console.log(failures === 0 ? '\nSMOKE PASS' : `\nSMOKE FAIL (${failures})`)
