@@ -59,6 +59,12 @@ function makeNode(tag) {
     getAttribute(key) {
       return node.attrs[key]
     },
+    hasAttribute(key) {
+      return Object.prototype.hasOwnProperty.call(node.attrs, key)
+    },
+    removeAttribute(key) {
+      delete node.attrs[key]
+    },
     addEventListener(type, fn) {
       ;(node.listeners[type] ||= []).push(fn)
     },
@@ -529,6 +535,92 @@ check('已发起轮询请求', fetchCalls > 0, 'calls=' + fetchCalls)
   check('Web 端：面板不显示卡片选项', webChips.indexOf('自动') === -1 && webChips.indexOf('总是弹') === -1, JSON.stringify(webChips))
   check('Web 端：面板仍显示声音相关设置', webChips.indexOf('叮咚') !== -1 && webChips.indexOf('右下') !== -1, JSON.stringify(webChips))
   check('Web 端：面板里有系统通知开关', !!find(wBody, (n) => n.tagName === 'LABEL' && textOf(n).includes('系统通知'))[0])
+}
+
+// ------------------------------------- 桌面端原生标题栏带避让（issue #1）
+// 桌面端是「无边框 + 原生按钮覆盖层」，顶部停靠必须让开这条带子，否则铃铛被盖住且点不到。
+{
+  const tBody = makeNode('body')
+  const tHead = makeNode('head')
+  const tHtml = makeNode('html')
+  const tWindowListeners = {}
+  const tWindow = {
+    innerWidth: 1440,
+    innerHeight: 900,
+    addEventListener: (type, fn) => {
+      ;(tWindowListeners[type] = tWindowListeners[type] || []).push(fn)
+    },
+    removeEventListener() {},
+    focus() {},
+  }
+  let tClearance = '40px'
+  const tSandbox = {
+    dshDesktopBoot: {},
+    Notification: class {
+      constructor(title, options) {
+        this.title = title
+        this.options = options || {}
+      }
+      close() {}
+    },
+    document: {
+      head: tHead,
+      body: tBody,
+      documentElement: tHtml,
+      title: 'DSH',
+      readyState: 'complete',
+      hidden: false,
+      hasFocus: () => true,
+      createElement: makeNode,
+      createTextNode(text) {
+        return { nodeType: 3, textContent: String(text), children: [], __classes: [], contains: () => false }
+      },
+      addEventListener() {},
+      removeEventListener() {},
+    },
+    window: tWindow,
+    location: { origin: 'dsh-app://app', host: 'app', href: 'dsh-app://app/' },
+    localStorage: {
+      getItem: (key) => (key === 'dsh-sound-alert.settings.v1' ? JSON.stringify({ bellCorner: 'tr' }) : null),
+      setItem() {},
+    },
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, seq: 0, alerts: [] }) }),
+    getComputedStyle: () => ({
+      getPropertyValue: (name) => (name === '--dsh-frame-top-clearance' ? tClearance : ''),
+    }),
+    URL,
+    console,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    requestAnimationFrame: (fn) => setTimeout(fn, 0),
+  }
+  tSandbox.globalThis = tSandbox
+  tSandbox.Notification.permission = 'granted'
+  vm.runInNewContext(code, tSandbox, { filename: 'widget.titlebar.js' })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+
+  const tDock = find(tBody, (n) => n.__classes.includes('dsa-dock'))[0]
+  check('标题栏：右上角停靠时让开 40px 原生按钮带', tDock && tDock.style.top === '52px', tDock && tDock.style.top)
+
+  const tCaret = find(tBody, (n) => n.__classes.includes('dsa-caret'))[0]
+  tCaret.dispatch('click')
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  const tPanel = find(tBody, (n) => n.__classes.includes('dsa-panel'))[0]
+  check('标题栏：面板同样让开按钮带', tPanel && tPanel.style.top === '92px', tPanel && tPanel.style.top)
+
+  // 全屏时原生带子消失，但 DSH 不会把 clearance 归零 —— 必须自己当作 0
+  tHtml.setAttribute('data-fullscreen', '')
+  ;(tWindowListeners.resize || []).forEach((fn) => fn())
+  check('标题栏：全屏时铃铛收回普通内缩', tDock.style.top === '12px', tDock.style.top)
+  check('标题栏：全屏时面板同时收回', tPanel.style.top === '52px', tPanel.style.top)
+
+  // 浏览器端（dsh web）没有这个变量 → 与修复前行为一致
+  tHtml.removeAttribute('data-fullscreen')
+  tClearance = ''
+  ;(tWindowListeners.resize || []).forEach((fn) => fn())
+  check('标题栏：读不到变量时回退普通内缩', tDock.style.top === '12px', tDock.style.top)
 }
 
 console.log(failures === 0 ? '\nSMOKE PASS' : `\nSMOKE FAIL (${failures})`)
